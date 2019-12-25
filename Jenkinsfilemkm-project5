@@ -1,0 +1,42 @@
+node 
+{
+    def MavenHome = tool name:"maven"
+    stage('Git_Checkout') {
+        git credentialsId: 'GitHub_Cre', url: 'https://github.com/modugulakrishna/spring-boot-mongo-docker.git'
+    }
+    
+    stage('Maven-Package') {
+        sh "${MavenHome}/bin/mvn clean package"
+    }
+    
+    stage(‘Codequality_with_sonar’) {
+    sh “${MavenHome}/bin/mvn sonar:sonar”
+}
+    stage('CreateDockerImage') {
+        sh "docker build . -t  modugulakrishna99/springdockermkm:1.0"
+    }
+    
+    stage('PushimageTOdockerHub') {
+        withCredentials([string(credentialsId: 'dockerHubPwd', variable: 'dockerHubPwd')]) {
+        sh "docker login -u modugulakrishna99 -p ${dockerHubPwd}"
+        sh "docker push modugulakrishna99/springdockermkm:1.0"
+}
+    }
+    
+    stage('Deployin-dockerswarm') {
+        
+        sshagent(['docker-server']) {
+    
+}       
+    }
+    sh "ssh -o StrictHostKeyChecking=no ubuntu@13.235.69.58 docker service create --name spring --replicas 6 modugulakrishna99/springdockermkm:1.0"
+    
+    stage('Deployin-Kubernates-cluster') {
+        kubernetesDeploy(
+            configs:'springBootMongo.yml',
+            kubeconfigId:'KUBERNATES-CONFIG',
+            enableConfigSubstituion: true
+            )
+    }
+    
+}
